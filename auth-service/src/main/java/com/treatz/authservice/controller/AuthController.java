@@ -4,6 +4,7 @@ import com.treatz.authservice.dto.AuthResponseDTO;
 import com.treatz.authservice.dto.LoginRequestDTO;
 import com.treatz.authservice.dto.RegisterRequestDTO;
 import com.treatz.authservice.service.AuthService;
+import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -23,7 +24,7 @@ public class AuthController {
     }
 
     @PostMapping("/register")
-    public ResponseEntity<AuthResponseDTO> register(@RequestBody RegisterRequestDTO request) {
+    public ResponseEntity<AuthResponseDTO> register(@Valid @RequestBody RegisterRequestDTO request) {
         // Now call the real service
         String message = authService.register(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(new AuthResponseDTO(null, message));

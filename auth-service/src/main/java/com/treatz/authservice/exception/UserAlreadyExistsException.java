@@ -1,0 +1,7 @@
+package com.treatz.authservice.exception;
+
+public class UserAlreadyExistsException extends RuntimeException {
+    public UserAlreadyExistsException(String message) {
+        super(message);
+    }
+}

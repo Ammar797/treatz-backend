@@ -4,6 +4,7 @@ import com.treatz.authservice.dto.AuthResponseDTO;
 import com.treatz.authservice.dto.LoginRequestDTO;
 import com.treatz.authservice.dto.RegisterRequestDTO;
 import com.treatz.authservice.entity.User;
+import com.treatz.authservice.exception.UserAlreadyExistsException;
 import com.treatz.authservice.repository.UserRepository;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -26,8 +27,14 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public String register(RegisterRequestDTO registerRequest) {
+
+        if (userRepository.findByEmail(registerRequest.getEmail()).isPresent()) {
+            throw new UserAlreadyExistsException("A user with this email already exists.");
+        }
+
         // Create a new User ID card from the registration form
         User user = new User();
+
         user.setEmail(registerRequest.getEmail());
         user.setRole(registerRequest.getRole());
         // Use the secret code machine to hash the password! NEVER store plain text.

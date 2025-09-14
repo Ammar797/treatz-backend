@@ -1,0 +1,11 @@
+# Build files
+target/
+*.jar
+*.war
+
+# IDE files
+.idea/
+*.iml
+
+# Log files
+*.log

@@ -58,7 +58,7 @@ public class AuthServiceImpl implements AuthService {
         }
 
         // 3. If everything is correct, print a new ID card (JWT)
-        String token = jwtService.generateToken(user.getEmail(), user.getRole());
+        String token = jwtService.generateToken(user.getEmail(), user.getRole(), user.getId());
 
         return new AuthResponseDTO(token, "Login successful!");
     }

@@ -54,4 +54,13 @@ public class MenuItemController {
         String message = restaurantService.deleteMenuItem(restaurantId, menuItemId);
         return ResponseEntity.ok(message);
     }
+
+    @PostMapping("/menu-items/details")
+    public ResponseEntity<List<MenuItemResponseDTO>> getMenuItemDetails(@RequestBody List<Long> menuItemIds) {
+        // The logic is now simple and correct:
+        // 1. We receive a list of IDs.
+        // 2. We call the service method that was specifically designed to handle this.
+        List<MenuItemResponseDTO> items = restaurantService.getMenuItemsByIds(menuItemIds);
+        return ResponseEntity.ok(items);
+    }
 }

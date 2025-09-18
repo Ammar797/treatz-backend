@@ -50,6 +50,12 @@ public class RestaurantServiceImpl implements RestaurantService {
     }
 
     @Override
+    public List<MenuItemResponseDTO> getMenuItemsByIds(List<Long> ids) {
+        List<MenuItem> menuItems = menuItemRepository.findByIdIn(ids);
+        return restaurantMapper.menuItemsToMenuItemResponseDTO(menuItems);
+    }
+
+    @Override
     public RestaurantResponseDTO getRestaurantById(Long restaurantId) {
         Restaurant restaurant = restaurantRepository.findById(restaurantId)
                 .orElseThrow(() -> new ResourceNotFoundException("Restaurant not found with id: " + restaurantId));

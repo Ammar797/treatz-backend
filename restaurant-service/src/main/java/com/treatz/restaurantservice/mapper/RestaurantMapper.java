@@ -46,4 +46,6 @@ public interface RestaurantMapper {
 
     // This is a helper mapping for the search DTO, creating the mini restaurant profile
     RestaurantInfoDTO restaurantToRestaurantInfoDTO(Restaurant restaurant);
+
+    List<MenuItemResponseDTO> menuItemsToMenuItemResponseDTO(List<MenuItem> menuItems);
 }

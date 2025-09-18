@@ -1,5 +1,7 @@
-package com.treatz.restaurantservice.config;
+package com.treatz.orderservice.config;
 
+import com.nimbusds.jose.jwk.source.ImmutableSecret;
+import io.jsonwebtoken.io.Decoders;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -11,8 +13,6 @@ import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.web.SecurityFilterChain;
-import io.jsonwebtoken.io.Decoders;
-import org.springframework.http.HttpMethod;
 
 import javax.crypto.spec.SecretKeySpec;
 
@@ -29,13 +29,7 @@ public class SecurityConfig {
         http
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
-                        // Explicitly allow GET requests to the restaurants endpoints for public viewing
-                        .requestMatchers(HttpMethod.GET, "/api/restaurants",
-                                "/api/restaurants/**" ,
-                                "/api/menu-items/search" ).permitAll()
-                        // ADD THIS LINE to allow the Order Service to call it without a token
-                        .requestMatchers(HttpMethod.POST, "/api/menu-items/details").permitAll()
-                        // All other requests (like POST) must be authenticated
+                        // For the Order Service, ALL requests must be authenticated.
                         .anyRequest().authenticated()
                 )
                 .oauth2ResourceServer(oauth2 -> oauth2
@@ -47,18 +41,18 @@ public class SecurityConfig {
         return http.build();
     }
 
+    // This bean is IDENTICAL to the restaurant-service one
     @Bean
     public JwtDecoder jwtDecoder() {
-        // IMPORTANT: Use Base64 decoding like your auth service
         byte[] keyBytes = Decoders.BASE64.decode(jwtSecret);
         SecretKeySpec secretKey = new SecretKeySpec(keyBytes, "HmacSHA256");
         return NimbusJwtDecoder.withSecretKey(secretKey).build();
     }
 
+    // This bean is also IDENTICAL to the restaurant-service one
     @Bean
     public JwtAuthenticationConverter jwtAuthenticationConverter() {
         JwtGrantedAuthoritiesConverter authoritiesConverter = new JwtGrantedAuthoritiesConverter();
-        // Tell Spring to look for "role" claim and add "ROLE_" prefix
         authoritiesConverter.setAuthorityPrefix("ROLE_");
         authoritiesConverter.setAuthoritiesClaimName("role");
 

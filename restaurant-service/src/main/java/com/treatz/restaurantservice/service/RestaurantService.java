@@ -10,7 +10,7 @@ public interface RestaurantService {
     List<RestaurantResponseDTO> getAllRestaurants();
     RestaurantResponseDTO updateRestaurant(Long restaurantId, UpdateRestaurantRequestDTO request);
     String deleteRestaurant(Long restaurantId);
-
+    List<MenuItemResponseDTO> getMenuItemsByIds(List<Long> ids);
 
     // Menu Item CRUD
     MenuItemResponseDTO addMenuItem(Long restaurantId, CreateMenuItemRequestDTO request);

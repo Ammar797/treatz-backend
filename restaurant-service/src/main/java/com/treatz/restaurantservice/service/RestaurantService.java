@@ -20,4 +20,5 @@ public interface RestaurantService {
     // Search Functionality
     List<RestaurantResponseDTO> searchRestaurantsByName(String name);
     List<MenuItemSearchResponseDTO> searchRestaurantsByMenuItem(String menuItemName);
+    Long getOwnerIdForRestaurant(Long restaurantId);
 }

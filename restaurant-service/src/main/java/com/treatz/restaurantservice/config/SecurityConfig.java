@@ -29,21 +29,10 @@ public class SecurityConfig {
         http
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
-                        // Explicitly allow GET requests to the restaurants endpoints for public viewing
-                        .requestMatchers(HttpMethod.GET, "/api/restaurants",
-                                "/api/restaurants/**" ,
-                                "/api/menu-items/search" ).permitAll()
-                        // ADD THIS LINE to allow the Order Service to call it without a token
-                        .requestMatchers(HttpMethod.POST, "/api/menu-items/details").permitAll()
-                        // All other requests (like POST) must be authenticated
+                        // EVERYTHING is now protected. No more .permitAll()
                         .anyRequest().authenticated()
                 )
-                .oauth2ResourceServer(oauth2 -> oauth2
-                        .jwt(jwt -> jwt
-                                .jwtAuthenticationConverter(jwtAuthenticationConverter())
-                        )
-                );
-
+                .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter())));
         return http.build();
     }
 

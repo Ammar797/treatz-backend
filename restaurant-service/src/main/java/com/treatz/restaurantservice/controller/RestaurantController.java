@@ -37,6 +37,13 @@ public class RestaurantController {
         return ResponseEntity.ok(restaurantService.getRestaurantById(id));
     }
 
+    // !!! THIS IS THE NEW, MISSING ENDPOINT !!!
+    // This is a special, internal-facing endpoint for other services.
+    @GetMapping("/{id}/owner")
+    public ResponseEntity<Long> getOwnerId(@PathVariable Long id) {
+        return ResponseEntity.ok(restaurantService.getOwnerIdForRestaurant(id));
+    }
+
 
     // --- PROTECTED WRITE ENDPOINTS (REQUIRE ROLE_RESTAURANT_OWNER) ---
 

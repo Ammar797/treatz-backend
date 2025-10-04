@@ -108,6 +108,16 @@ public class RestaurantServiceImpl implements RestaurantService {
         return "Menu item with ID " + menuItemId + " deleted successfully.";
     }
 
+    @Override
+    public Long getOwnerIdForRestaurant(Long restaurantId) {
+        // Find the restaurant by its ID
+        Restaurant restaurant = restaurantRepository.findById(restaurantId)
+                // If it's not found, throw our standard exception
+                .orElseThrow(() -> new ResourceNotFoundException("Restaurant not found with id: " + restaurantId));
+        // Return just the ownerId from the entity
+        return restaurant.getOwnerId();
+    }
+
     // == SEARCH LOGIC ==
 
     @Override

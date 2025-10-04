@@ -8,15 +8,22 @@ import com.treatz.orderservice.dto.OrderResponseDTO;
 import com.treatz.orderservice.entity.Order;
 import com.treatz.orderservice.entity.OrderItem;
 import com.treatz.orderservice.entity.OrderStatus;
+import com.treatz.orderservice.exception.InvalidOrderStatusTransitionException;
+import com.treatz.orderservice.exception.ResourceNotFoundException;
 import com.treatz.orderservice.repository.OrderRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
 import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient; // For making API calls
+import com.treatz.orderservice.mapper.OrderMapper;
+import com.treatz.orderservice.dto.UpdateOrderStatusRequestDTO;
+import org.springframework.security.access.AccessDeniedException;
+
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -25,14 +32,13 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
-@EnableJpaAuditing
-@EnableDiscoveryClient
 
 public class OrderServiceImpl implements OrderService {
 
     private final OrderRepository orderRepository;
     private final WebClient.Builder webClientBuilder; // Tool for calling other services
     private final RabbitTemplate rabbitTemplate; // Our "Postal Worker" for sending messages
+    private final OrderMapper orderMapper;
 
     @Override
     public OrderResponseDTO createOrder(CreateOrderRequestDTO createOrderRequest) {
@@ -122,5 +128,130 @@ public class OrderServiceImpl implements OrderService {
         response.setItems(itemDTOs);
 
         return response;
+    }
+
+    // In OrderServiceImpl.java
+
+    @Override
+    public List<OrderResponseDTO> getOrdersForRestaurant(Long restaurantId, String status) {
+        // === Step 1: Get the ID of the user making the request from the JWT ===
+        Jwt principal = (Jwt) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        Long authenticatedUserId = principal.getClaim("userId");
+
+        // === Step 2: Call the Restaurant Service to find out who the real owner is ===
+        Long actualOwnerId = webClientBuilder.build()
+                .get()
+                .uri("http://restaurant-service/api/restaurants/" + restaurantId + "/owner")
+                .retrieve()
+                .bodyToMono(Long.class)
+                .block();
+
+        // === Step 3: THE CRITICAL SECURITY CHECK ===
+        if (!actualOwnerId.equals(authenticatedUserId)) {
+            throw new AccessDeniedException("User is not authorized to view these orders.");
+        }
+
+        // === Step 4: If security passes, fetch the orders from the database ===
+        OrderStatus orderStatus = OrderStatus.valueOf(status.toUpperCase());
+        List<Order> orders = orderRepository.findByRestaurantIdAndStatus(restaurantId, orderStatus);
+
+        // === Step 5: Map the results to DTOs and return them ===
+        return orders.stream()
+                .map(orderMapper::orderToResponseDTO)
+                .collect(Collectors.toList());
+    }
+
+    // In OrderServiceImpl.java
+
+    // In OrderServiceImpl.java
+
+    // In OrderServiceImpl.java
+
+    @Override
+    public OrderResponseDTO updateOrderStatus(Long orderId, UpdateOrderStatusRequestDTO request) {
+        // === Step 1: Find the order and get the new status ===
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Order not found with id: " + orderId));
+
+        OrderStatus newStatus = OrderStatus.valueOf(request.getStatus().toUpperCase());
+        OrderStatus currentStatus = order.getStatus();
+
+        // === Step 2: THE CRITICAL FIX - Check the type of caller BEFORE accessing the JWT ===
+        var authentication = SecurityContextHolder.getContext().getAuthentication();
+        boolean isExternalUser = authentication != null && authentication.getPrincipal() instanceof Jwt;
+
+        if (isExternalUser) {
+            // --- This is a REAL USER with a JWT (Restaurant Owner or Rider) ---
+            Jwt principal = (Jwt) authentication.getPrincipal();
+            Long authenticatedUserId = principal.getClaim("userId");
+
+            // We check the user's official granted authorities.
+            if (authentication.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_RESTAURANT_OWNER"))) {
+                // --- Security & State Logic for RESTAURANT_OWNER ---
+                Long actualOwnerId = webClientBuilder.build().get().uri("http://restaurant-service/api/restaurants/" + order.getRestaurantId() + "/owner").retrieve().bodyToMono(Long.class).block();
+                if (!actualOwnerId.equals(authenticatedUserId)) {
+                    throw new AccessDeniedException("User is not authorized to update this order.");
+                }
+
+                switch (newStatus) {
+                    case ACCEPTED:
+                        if (currentStatus != OrderStatus.PENDING) throw new InvalidOrderStatusTransitionException("Can only accept a PENDING order.");
+                        break;
+                    case PREPARING:
+                        if (currentStatus != OrderStatus.ACCEPTED) throw new InvalidOrderStatusTransitionException("Can only prepare an ACCEPTED order.");
+                        break;
+                    case READY_FOR_PICKUP:
+                        if (currentStatus != OrderStatus.PREPARING) throw new InvalidOrderStatusTransitionException("Can only mark a PREPARING order as ready.");
+                        break;
+                    default:
+                        throw new InvalidOrderStatusTransitionException("Restaurant owner cannot change status to " + newStatus);
+                }
+            } else if (authentication.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_RIDER"))) {
+                // --- Security & State Logic for RIDER ---
+                switch (newStatus) {
+                    case DELIVERED:
+                        if (currentStatus != OrderStatus.DISPATCHED) throw new InvalidOrderStatusTransitionException("Can only deliver a DISPATCHED order.");
+                        if (order.getRiderId() == null || !order.getRiderId().equals(authenticatedUserId)) {
+                            throw new AccessDeniedException("Rider is not authorized to deliver this order.");
+                        }
+                        break;
+                    default:
+                        throw new InvalidOrderStatusTransitionException("Rider cannot change status to " + newStatus);
+                }
+            } else {
+                throw new AccessDeniedException("User is not authorized to update order status.");
+            }
+        } else {
+            // --- This is an INTERNAL, anonymous call (from Dispatch Service) ---
+            // We trust this call and only check the state transition.
+            if (newStatus != OrderStatus.DISPATCHED || currentStatus != OrderStatus.READY_FOR_PICKUP) {
+                throw new InvalidOrderStatusTransitionException("Internal service can only change status from READY_FOR_PICKUP to DISPATCHED.");
+            }
+        }
+
+        // === Step 3: If all rules pass, update the order object ===
+        order.setStatus(newStatus);
+        // Set the rider ID if it was provided in the request (from Dispatch Service or Rider)
+        if (request.getRiderId() != null) {
+            order.setRiderId(request.getRiderId());
+        } else if (isExternalUser && "ROLE_RIDER".equals(((Jwt) authentication.getPrincipal()).getClaim("role")) && newStatus == OrderStatus.DISPATCHED){
+            // If a rider is dispatching, assign them to the order
+            order.setRiderId(((Jwt) authentication.getPrincipal()).getClaim("userId"));
+        }
+
+        // === Step 4: Save to database, publish event, and return response ===
+        Order updatedOrder = orderRepository.save(order);
+        String routingKey = "order.status." + newStatus.name().toLowerCase();
+        rabbitTemplate.convertAndSend(RabbitMQConfig.EXCHANGE_NAME, routingKey, updatedOrder);
+        System.out.println("Published event with routing key: " + routingKey);
+
+        return orderMapper.orderToResponseDTO(updatedOrder);
+    }
+    @Override
+    public List<OrderResponseDTO> findAllByStatus(String status) {
+        OrderStatus orderStatus = OrderStatus.valueOf(status.toUpperCase());
+        return orderRepository.findAllByStatus(orderStatus).stream()
+                .map(orderMapper::orderToResponseDTO)
+                .collect(Collectors.toList());
     }
 }

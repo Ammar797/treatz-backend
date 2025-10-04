@@ -5,6 +5,7 @@ import io.jsonwebtoken.io.Decoders;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -24,24 +25,20 @@ public class SecurityConfig {
     @Value("${jwt.secret}")
     private String jwtSecret;
 
+    // In order-service's SecurityConfig.java
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
-                        // For the Order Service, ALL requests must be authenticated.
+                        // EVERYTHING is now protected.
                         .anyRequest().authenticated()
                 )
-                .oauth2ResourceServer(oauth2 -> oauth2
-                        .jwt(jwt -> jwt
-                                .jwtAuthenticationConverter(jwtAuthenticationConverter())
-                        )
-                );
-
+                .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter())));
         return http.build();
     }
 
-    // This bean is IDENTICAL to the restaurant-service one
+    // These helper beans are unchanged and correct.
     @Bean
     public JwtDecoder jwtDecoder() {
         byte[] keyBytes = Decoders.BASE64.decode(jwtSecret);
@@ -49,7 +46,6 @@ public class SecurityConfig {
         return NimbusJwtDecoder.withSecretKey(secretKey).build();
     }
 
-    // This bean is also IDENTICAL to the restaurant-service one
     @Bean
     public JwtAuthenticationConverter jwtAuthenticationConverter() {
         JwtGrantedAuthoritiesConverter authoritiesConverter = new JwtGrantedAuthoritiesConverter();

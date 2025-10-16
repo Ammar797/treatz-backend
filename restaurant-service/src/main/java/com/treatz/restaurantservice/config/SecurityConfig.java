@@ -29,7 +29,13 @@ public class SecurityConfig {
         http
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
-                        // EVERYTHING is now protected. No more .permitAll()
+                        // Rule #1: THE FIX - These specific GET endpoints are public for browsing.
+                        .requestMatchers(HttpMethod.GET, "/api/restaurants", "/api/restaurants/**", "/api/menu-items/search").permitAll()
+
+                        // Rule #2: These are the internal "staff entrances" for other services.
+                        .requestMatchers("/api/restaurants/*/owner", "/api/menu-items/details").permitAll()
+
+                        // Rule #3: All other requests (like POST, PUT, DELETE) MUST be authenticated.
                         .anyRequest().authenticated()
                 )
                 .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter())));

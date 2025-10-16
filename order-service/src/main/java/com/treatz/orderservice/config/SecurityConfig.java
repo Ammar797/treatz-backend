@@ -26,12 +26,19 @@ public class SecurityConfig {
     private String jwtSecret;
 
     // In order-service's SecurityConfig.java
+    // In order-service's SecurityConfig.java
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
-                        // EVERYTHING is now protected.
+                        // Rule #1: These are the internal "staff entrances" for trusted service-to-service calls.
+                        // They are not exposed to the public through the Gateway.
+                        .requestMatchers(HttpMethod.PUT, "/api/orders/*/status").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/orders/internal/status/*").permitAll()
+
+                        // Rule #2: All other requests MUST be authenticated.
+                        // This correctly protects creating and viewing orders.
                         .anyRequest().authenticated()
                 )
                 .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter())));

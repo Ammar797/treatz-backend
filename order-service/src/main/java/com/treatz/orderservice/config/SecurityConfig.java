@@ -1,7 +1,5 @@
 package com.treatz.orderservice.config;
 
-import com.nimbusds.jose.jwk.source.ImmutableSecret;
-import io.jsonwebtoken.io.Decoders;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -25,30 +23,27 @@ public class SecurityConfig {
     @Value("${jwt.secret}")
     private String jwtSecret;
 
-    // In order-service's SecurityConfig.java
-    // In order-service's SecurityConfig.java
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
-                        // Rule #1: These are the internal "staff entrances" for trusted service-to-service calls.
-                        // They are not exposed to the public through the Gateway.
+                        // Internal endpoints for service-to-service calls
                         .requestMatchers(HttpMethod.PUT, "/api/orders/*/status").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/orders/internal/status/*").permitAll()
-
-                        // Rule #2: All other requests MUST be authenticated.
-                        // This correctly protects creating and viewing orders.
+                        // Everything else needs authentication
                         .anyRequest().authenticated()
                 )
-                .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter())));
+                .oauth2ResourceServer(oauth2 -> oauth2
+                        .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter()))
+                );
         return http.build();
     }
 
-    // These helper beans are unchanged and correct.
     @Bean
     public JwtDecoder jwtDecoder() {
-        byte[] keyBytes = Decoders.BASE64.decode(jwtSecret);
+        // Use the secret directly as bytes (same as Auth Service)
+        byte[] keyBytes = jwtSecret.getBytes();
         SecretKeySpec secretKey = new SecretKeySpec(keyBytes, "HmacSHA256");
         return NimbusJwtDecoder.withSecretKey(secretKey).build();
     }

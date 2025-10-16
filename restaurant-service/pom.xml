@@ -15,7 +15,7 @@
 	<groupId>com.treatz</groupId>
 	<artifactId>restaurant-service</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
-	<n>restaurant-service</n>
+	<name>restaurant-service</name>  <!-- Fixed the typo here -->
 	<description>Restaurant Service for Treatz</description>
 
 	<properties>

@@ -1,6 +1,5 @@
 package com.treatz.apigateway.config;
 
-// Note the different imports for reactive security!
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -21,7 +20,7 @@ import reactor.core.publisher.Mono;
 import javax.crypto.spec.SecretKeySpec;
 
 @Configuration
-@EnableWebFluxSecurity // The reactive version of @EnableWebSecurity
+@EnableWebFluxSecurity
 public class SecurityConfig {
 
     @Value("${jwt.secret}")
@@ -32,11 +31,11 @@ public class SecurityConfig {
         http
                 .csrf(ServerHttpSecurity.CsrfSpec::disable)
                 .authorizeExchange(exchange -> exchange
-                        // Rule #1: The login and register endpoints are public
+                        // Auth endpoints are public
                         .pathMatchers("/auth/**").permitAll()
-                        // Rule #2: Public GET endpoints for restaurants are also allowed
+                        // Public GET endpoints for browsing
                         .pathMatchers(HttpMethod.GET, "/api/restaurants", "/api/restaurants/**", "/api/menu-items/search").permitAll()
-                        // Rule #3: All other requests must be authenticated
+                        // Everything else needs authentication
                         .anyExchange().authenticated()
                 )
                 .oauth2ResourceServer(oauth2 -> oauth2
@@ -48,28 +47,23 @@ public class SecurityConfig {
         return http.build();
     }
 
-    // This is the reactive version of our JwtDecoder bean
     @Bean
     public ReactiveJwtDecoder jwtDecoder() {
+        // Use the secret directly as bytes (same as Auth Service)
         byte[] keyBytes = jwtSecret.getBytes();
         SecretKeySpec secretKey = new SecretKeySpec(keyBytes, "HmacSHA256");
         return NimbusReactiveJwtDecoder.withSecretKey(secretKey).build();
     }
 
-    // This is the reactive version of our role converter
     @Bean
     public Converter<Jwt, Mono<AbstractAuthenticationToken>> jwtAuthenticationConverter() {
-        // This is the standard, non-reactive converter. It's our "European Plug".
         JwtGrantedAuthoritiesConverter authoritiesConverter = new JwtGrantedAuthoritiesConverter();
         authoritiesConverter.setAuthorityPrefix("ROLE_");
         authoritiesConverter.setAuthoritiesClaimName("role");
 
-        // This is our new "Adapter". It takes the non-reactive converter...
         ReactiveJwtAuthenticationConverter jwtConverter = new ReactiveJwtAuthenticationConverter();
         jwtConverter.setJwtGrantedAuthoritiesConverter(jwt -> {
-            // ...calls it to get the Collection of authorities...
             var authorities = authoritiesConverter.convert(jwt);
-            // ...and then wraps that Collection in a reactive stream (a Flux).
             return Flux.fromIterable(authorities);
         });
 

@@ -11,7 +11,6 @@ import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.web.SecurityFilterChain;
-import io.jsonwebtoken.io.Decoders;
 import org.springframework.http.HttpMethod;
 
 import javax.crypto.spec.SecretKeySpec;
@@ -29,23 +28,23 @@ public class SecurityConfig {
         http
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
-                        // Rule #1: THE FIX - These specific GET endpoints are public for browsing.
+                        // Public GET endpoints
                         .requestMatchers(HttpMethod.GET, "/api/restaurants", "/api/restaurants/**", "/api/menu-items/search").permitAll()
-
-                        // Rule #2: These are the internal "staff entrances" for other services.
+                        // Internal endpoints
                         .requestMatchers("/api/restaurants/*/owner", "/api/menu-items/details").permitAll()
-
-                        // Rule #3: All other requests (like POST, PUT, DELETE) MUST be authenticated.
+                        // Everything else needs authentication
                         .anyRequest().authenticated()
                 )
-                .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter())));
+                .oauth2ResourceServer(oauth2 -> oauth2
+                        .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter()))
+                );
         return http.build();
     }
 
     @Bean
     public JwtDecoder jwtDecoder() {
-        // IMPORTANT: Use Base64 decoding like your auth service
-        byte[] keyBytes = Decoders.BASE64.decode(jwtSecret);
+        // Use the secret directly as bytes (same as Auth Service)
+        byte[] keyBytes = jwtSecret.getBytes();
         SecretKeySpec secretKey = new SecretKeySpec(keyBytes, "HmacSHA256");
         return NimbusJwtDecoder.withSecretKey(secretKey).build();
     }
@@ -53,7 +52,6 @@ public class SecurityConfig {
     @Bean
     public JwtAuthenticationConverter jwtAuthenticationConverter() {
         JwtGrantedAuthoritiesConverter authoritiesConverter = new JwtGrantedAuthoritiesConverter();
-        // Tell Spring to look for "role" claim and add "ROLE_" prefix
         authoritiesConverter.setAuthorityPrefix("ROLE_");
         authoritiesConverter.setAuthoritiesClaimName("role");
 

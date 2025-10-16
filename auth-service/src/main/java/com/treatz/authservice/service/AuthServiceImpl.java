@@ -9,16 +9,16 @@ import com.treatz.authservice.repository.UserRepository;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-@Service // Tells Spring that this class is a service component
+@Service
+@Transactional
 public class AuthServiceImpl implements AuthService {
 
-    // Give the manager the tools they need
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
 
-    // Constructor to receive the tools (Dependency Injection)
     public AuthServiceImpl(UserRepository userRepository, PasswordEncoder passwordEncoder, JwtService jwtService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
@@ -27,39 +27,43 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public String register(RegisterRequestDTO registerRequest) {
-
+        // Check if user already exists
         if (userRepository.findByEmail(registerRequest.getEmail()).isPresent()) {
-            throw new UserAlreadyExistsException("A user with this email already exists.");
+            throw new UserAlreadyExistsException("User with email " + registerRequest.getEmail() + " already exists");
         }
 
-        // Create a new User ID card from the registration form
-        User user = new User();
+        // Validate role
+        String role = registerRequest.getRole().toUpperCase();
+        if (!role.equals("CUSTOMER") && !role.equals("RESTAURANT_OWNER") && !role.equals("RIDER")) {
+            throw new IllegalArgumentException("Invalid role. Must be CUSTOMER, RESTAURANT_OWNER, or RIDER");
+        }
 
+        // Create new user
+        User user = new User();
         user.setEmail(registerRequest.getEmail());
-        user.setRole(registerRequest.getRole());
-        // Use the secret code machine to hash the password! NEVER store plain text.
+        user.setRole(role);
         user.setPassword(passwordEncoder.encode(registerRequest.getPassword()));
 
-        // Save the new ID card in the filing cabinet
+        // Save user
         userRepository.save(user);
 
-        return "User registered successfully!";
+        return "User registered successfully with role: " + role;
     }
 
     @Override
     public AuthResponseDTO login(LoginRequestDTO loginRequest) {
-        // 1. Find the user in the filing cabinet
+        // Find user by email
         User user = userRepository.findByEmail(loginRequest.getEmail())
                 .orElseThrow(() -> new BadCredentialsException("Invalid email or password"));
 
-        // 2. Check if the provided password matches the one from the secret code machine
+        // Check password
         if (!passwordEncoder.matches(loginRequest.getPassword(), user.getPassword())) {
             throw new BadCredentialsException("Invalid email or password");
         }
 
-        // 3. If everything is correct, print a new ID card (JWT)
+        // Generate JWT token
         String token = jwtService.generateToken(user.getEmail(), user.getRole(), user.getId());
 
-        return new AuthResponseDTO(token, "Login successful!");
+        return new AuthResponseDTO(token, "Login successful! Welcome " + user.getEmail());
     }
 }

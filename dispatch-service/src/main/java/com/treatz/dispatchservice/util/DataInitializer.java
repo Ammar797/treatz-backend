@@ -19,12 +19,12 @@ public class DataInitializer implements CommandLineRunner {
             System.out.println("No riders found in dispatch DB. Creating sample riders...");
 
             Rider rider1 = new Rider();
-            rider1.setUserId(10L); // <-- Use the ID of the FIRST RIDER from the Auth Service
+            rider1.setUserId(1L); // <-- Use the ID of the FIRST RIDER from the Auth Service
             rider1.setName("Ravi Kumar");
             rider1.setAvailable(true);
 
             Rider rider2 = new Rider();
-            rider2.setUserId(11L); // <-- Use the ID of the SECOND RIDER from the Auth Service
+            rider2.setUserId(2L); // <-- Use the ID of the SECOND RIDER from the Auth Service
             rider2.setName("Rohit Sharma");
             rider2.setAvailable(true);
 

@@ -123,15 +123,6 @@ Include JWT: `Authorization: Bearer <token>`
 - JWT authentication in distributed systems
 - Error handling and resilience patterns
 
-## Future Enhancements
-
-- Circuit breaker pattern (Resilience4j)
-- Redis caching for menu data
-- Distributed tracing (Sleuth/Zipkin)
-- Docker Compose for containerization
-- Real payment gateway (Razorpay/Stripe)
-- Saga pattern for distributed transactions
-
 ---
 
 Built to explore microservices and Spring Cloud.

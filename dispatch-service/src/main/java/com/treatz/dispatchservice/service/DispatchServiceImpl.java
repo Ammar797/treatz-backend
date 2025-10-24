@@ -20,18 +20,27 @@ public class DispatchServiceImpl implements DispatchService {
 
     @Override
     public void processOrderForDispatch(OrderDTO orderDTO) {
-        log.info("Processing order {} for dispatch.", orderDTO.getId());
+        log.info("🚴 Processing order {} for dispatch.", orderDTO.getId());
 
         // Step 1: Find an available rider from our database.
         Rider availableRider = riderRepository.findFirstByIsAvailableTrue()
-                .orElseThrow(() -> new RuntimeException("No available riders found for order " + orderDTO.getId()));
+                .orElseThrow(() -> {
+                    log.error("❌ No available riders found for order {}. All riders are busy.", orderDTO.getId());
+                    return new RuntimeException("No available riders. Please try again later.");
+                });
 
-        log.info("Found available rider: {} (User ID: {})", availableRider.getName(), availableRider.getUserId());
+        log.info("✅ Found available rider: {} (User ID: {})", availableRider.getName(), availableRider.getUserId());
 
-        // Step 2: Assign the order by making the rider unavailable.
+        // Step 2: Double-check rider is actually available (race condition protection)
+        if (!availableRider.isAvailable()) {
+            log.warn("⚠️ Rider {} was marked available but is now busy. Retrying...", availableRider.getName());
+            throw new RuntimeException("Rider assignment conflict. Please retry.");
+        }
+
+        // Step 3: Assign the order by making the rider unavailable.
         availableRider.setAvailable(false);
         riderRepository.save(availableRider);
-        log.info("Rider {} is now assigned and unavailable.", availableRider.getName());
+        log.info("🔒 Rider {} is now assigned and unavailable.", availableRider.getName());
 
         // Step 3: Notify the Order Service that the order has been dispatched.
         try {
@@ -61,21 +70,33 @@ public class DispatchServiceImpl implements DispatchService {
 
     @Override
     public void releaseRiderForOrder(OrderDTO orderDTO) {
+        log.info("🔓 Releasing rider for delivered order {}", orderDTO.getId());
+
+        // Validation: Check if riderId exists
         if (orderDTO.getRiderId() == null) {
-            log.warn("Cannot release rider for order {}: riderId is null in the event payload.", orderDTO.getId());
+            log.warn("⚠️ Cannot release rider for order {}: riderId is null in the event payload.", orderDTO.getId());
             return;
         }
 
+        // Find rider in database
         Rider rider = riderRepository.findByUserId(orderDTO.getRiderId())
                 .orElse(null);
 
         if (rider == null) {
-            log.warn("Could not find rider profile for userId {} to release.", orderDTO.getRiderId());
+            log.warn("⚠️ Could not find rider profile for userId {} to release.", orderDTO.getRiderId());
             return;
         }
 
+        // Double-check rider is actually busy before releasing
+        if (rider.isAvailable()) {
+            log.warn("⚠️ Rider {} was already marked as available. No action needed.", rider.getName());
+            return;
+        }
+
+        // Release rider
         rider.setAvailable(true);
         riderRepository.save(rider);
-        log.info("Rider {} (User ID: {}) has completed delivery for order {} and is now available.", rider.getName(), rider.getUserId(), orderDTO.getId());
+        log.info("✅ Rider {} (User ID: {}) completed delivery for order {} and is now available again!",
+                 rider.getName(), rider.getUserId(), orderDTO.getId());
     }
 }

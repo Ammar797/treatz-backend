@@ -78,12 +78,21 @@ public class OrderServiceImpl implements OrderService {
         order.setRestaurantId(createOrderRequest.getRestaurantId());
         order.setStatus(OrderStatus.PENDING);
 
+        // Set payment information
+        order.setPaymentMethod(createOrderRequest.getPaymentMethod());
+        order.setPaymentStatus(com.treatz.orderservice.entity.PaymentStatus.PENDING);
+
+        // Set delivery information
+        order.setDeliveryAddress(createOrderRequest.getDeliveryAddress());
+        order.setCustomerPhone(createOrderRequest.getCustomerPhone());
+        order.setDeliveryInstructions(createOrderRequest.getDeliveryInstructions());
+
         List<OrderItem> orderItems = createOrderRequest.getItems().stream().map(reqItem -> {
             MenuItemResponseDTO details = menuItemMap.get(reqItem.getMenuItemId());
             OrderItem orderItem = new OrderItem();
             orderItem.setMenuItemId(reqItem.getMenuItemId());
             orderItem.setQuantity(reqItem.getQuantity());
-            orderItem.setPricePerItem(BigDecimal.valueOf(details.getPrice()));
+            orderItem.setPricePerItem(details.getPrice()); // Already BigDecimal, no valueOf needed
             orderItem.setOrder(order);
             return orderItem;
         }).toList();
@@ -96,7 +105,10 @@ public class OrderServiceImpl implements OrderService {
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         order.setTotalPrice(totalPrice);
 
-        // === Step 5: Save the Order to the Database ===
+        // === Step 5: Process Payment ===
+        processPayment(order);
+
+        // === Step 6: Save the Order to the Database ===
         Order savedOrder = orderRepository.save(order);
 
         // === Step 6: PUBLISH THE EVENT! ===
@@ -109,14 +121,21 @@ public class OrderServiceImpl implements OrderService {
         );
 
         // === Step 7: Return the Response ===
-        // We need a mapper for this, but for now, let's do it manually
         OrderResponseDTO response = new OrderResponseDTO();
         response.setId(savedOrder.getId());
         response.setCustomerId(savedOrder.getCustomerId());
         response.setRestaurantId(savedOrder.getRestaurantId());
+        response.setRiderId(savedOrder.getRiderId());
         response.setTotalPrice(savedOrder.getTotalPrice());
         response.setStatus(savedOrder.getStatus().toString());
+        response.setPaymentStatus(savedOrder.getPaymentStatus().toString());
+        response.setPaymentMethod(savedOrder.getPaymentMethod().toString());
+        response.setPaymentTransactionId(savedOrder.getPaymentTransactionId());
+        response.setDeliveryAddress(savedOrder.getDeliveryAddress());
+        response.setCustomerPhone(savedOrder.getCustomerPhone());
+        response.setDeliveryInstructions(savedOrder.getDeliveryInstructions());
         response.setCreatedAt(savedOrder.getCreatedAt());
+        response.setUpdatedAt(savedOrder.getUpdatedAt());
 
         List<OrderItemResponseDTO> itemDTOs = savedOrder.getItems().stream().map(item -> {
             OrderItemResponseDTO dto = new OrderItemResponseDTO();
@@ -253,5 +272,71 @@ public class OrderServiceImpl implements OrderService {
         return orderRepository.findAllByStatus(orderStatus).stream()
                 .map(orderMapper::orderToResponseDTO)
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<OrderResponseDTO> getMyOrders() {
+        // Get customer ID from JWT
+        Jwt principal = (Jwt) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        Long customerId = principal.getClaim("userId");
+
+        // Fetch all orders for this customer, newest first
+        List<Order> orders = orderRepository.findByCustomerIdOrderByCreatedAtDesc(customerId);
+
+        // Map to DTOs
+        return orders.stream()
+                .map(orderMapper::orderToResponseDTO)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public OrderResponseDTO getOrderById(Long orderId) {
+        // Find the order
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Order not found with id: " + orderId));
+
+        // Security check: Only the customer who placed the order can view it
+        Jwt principal = (Jwt) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        Long authenticatedUserId = principal.getClaim("userId");
+
+        if (!order.getCustomerId().equals(authenticatedUserId)) {
+            throw new AccessDeniedException("You are not authorized to view this order.");
+        }
+
+        // Return the order details
+        return orderMapper.orderToResponseDTO(order);
+    }
+
+    // === PAYMENT PROCESSING (Simulated) ===
+    private void processPayment(Order order) {
+        com.treatz.orderservice.entity.PaymentMethod method = order.getPaymentMethod();
+
+        if (method == com.treatz.orderservice.entity.PaymentMethod.CASH_ON_DELIVERY) {
+            // Cash on delivery - no payment verification needed
+            order.setPaymentStatus(com.treatz.orderservice.entity.PaymentStatus.COMPLETED);
+            order.setPaymentTransactionId("COD-" + System.currentTimeMillis());
+            System.out.println("💵 Payment: Cash on Delivery - No verification needed");
+        } else {
+            // Card/UPI payment - simulate payment gateway call
+            // In real world, you'd call Stripe/Razorpay API here
+            boolean paymentSuccess = simulatePaymentGateway(order);
+
+            if (paymentSuccess) {
+                order.setPaymentStatus(com.treatz.orderservice.entity.PaymentStatus.COMPLETED);
+                order.setPaymentTransactionId(method.name() + "-" + System.currentTimeMillis());
+                System.out.println("✅ Payment successful via " + method + " - Transaction ID: " + order.getPaymentTransactionId());
+            } else {
+                order.setPaymentStatus(com.treatz.orderservice.entity.PaymentStatus.FAILED);
+                throw new IllegalArgumentException("Payment failed. Please check your payment details and try again.");
+            }
+        }
+    }
+
+    // Simulates payment gateway response
+    private boolean simulatePaymentGateway(Order order) {
+        // In real world: Call Stripe/Razorpay API, handle webhooks
+        // For demo: Always return true (payment successful)
+        System.out.println("🔄 Simulating payment gateway call for amount: $" + order.getTotalPrice());
+        return true;  // Payment always succeeds in simulation
     }
 }

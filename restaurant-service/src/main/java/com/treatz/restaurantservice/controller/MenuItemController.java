@@ -4,6 +4,10 @@ import com.treatz.restaurantservice.dto.*;
 import com.treatz.restaurantservice.service.RestaurantService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -20,17 +24,34 @@ public class MenuItemController {
 
     // --- PUBLIC READ AND SEARCH ENDPOINTS ---
 
+    /**
+     * Get menu items for a specific restaurant
+     */
     @GetMapping("/restaurants/{restaurantId}/menu")
     public ResponseEntity<List<MenuItemResponseDTO>> getMenuForRestaurant(@PathVariable Long restaurantId) {
-        // We can get this from the getRestaurantById method in the service if we enhance it,
-        // but for now this is fine as the service method already checks if the restaurant exists.
         RestaurantResponseDTO restaurant = restaurantService.getRestaurantById(restaurantId);
         return ResponseEntity.ok(restaurant.getMenuItems());
     }
 
+    /**
+     * Search menu items across all restaurants (with optional pagination)
+     * Without pagination params: Returns Page with default 100 items
+     * With pagination params: Returns specified page
+     */
     @GetMapping("/menu-items/search")
-    public ResponseEntity<List<MenuItemSearchResponseDTO>> searchByMenuItem(@RequestParam String query) {
-        return ResponseEntity.ok(restaurantService.searchRestaurantsByMenuItem(query));
+    public ResponseEntity<Page<MenuItemSearchResponseDTO>> searchByMenuItem(
+            @RequestParam String query,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size,
+            @RequestParam(defaultValue = "id") String sortBy,
+            @RequestParam(defaultValue = "ASC") String sortDirection) {
+        Sort.Direction direction = Sort.Direction.fromString(sortDirection);
+        Pageable pageable = PageRequest.of(
+                page != null ? page : 0,
+                size != null ? size : 100,
+                Sort.by(direction, sortBy)
+        );
+        return ResponseEntity.ok(restaurantService.searchRestaurantsByMenuItem(query, pageable));
     }
 
     // --- PROTECTED WRITE ENDPOINTS (REQUIRE ROLE_RESTAURANT_OWNER) ---

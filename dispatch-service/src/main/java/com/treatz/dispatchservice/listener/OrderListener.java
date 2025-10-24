@@ -19,17 +19,26 @@ public class OrderListener {
 
     @RabbitListener(queues = RabbitMQConfig.QUEUE_NAME)
     public void handleOrderEvents(OrderDTO orderDTO) {
-        // This listener is now a central hub for all order-related events.
+        log.info("📩 [RabbitMQ] Received order event for Order ID: {} with status: {}",
+                 orderDTO.getId(), orderDTO.getStatus());
+
         try {
             if ("READY_FOR_PICKUP".equals(orderDTO.getStatus())) {
-                log.info("Received a READY_FOR_PICKUP event for Order ID {}", orderDTO.getId());
+                log.info("🚨 Order {} is READY_FOR_PICKUP - assigning rider...", orderDTO.getId());
                 dispatchService.processOrderForDispatch(orderDTO);
             } else if ("DELIVERED".equals(orderDTO.getStatus())) {
-                log.info("Received a DELIVERED event for Order ID {}", orderDTO.getId());
-                dispatchService.releaseRiderForOrder(orderDTO); // We will build this method next
+                log.info("📦 Order {} is DELIVERED - releasing rider...", orderDTO.getId());
+                dispatchService.releaseRiderForOrder(orderDTO);
+            } else {
+                log.debug("ℹ️ Ignoring event with status '{}' for Order {}", orderDTO.getStatus(), orderDTO.getId());
             }
+        } catch (RuntimeException e) {
+            // Better error handling with specific message
+            log.error("❌ Failed to process event for Order {}: {}", orderDTO.getId(), e.getMessage());
+            // Message stays in queue and can be retried if needed
         } catch (Exception e) {
-            log.error("Error processing event for Order ID {}: {}", orderDTO.getId(), e.getMessage());
+            // Unexpected error
+            log.error("💥 Unexpected error processing Order {}: {}", orderDTO.getId(), e.getMessage(), e);
         }
     }
 }

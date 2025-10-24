@@ -59,5 +59,20 @@ public class OrderController {
         return ResponseEntity.ok(orders);
     }
 
+    // === CUSTOMER ORDER APIs ===
+
+    @GetMapping("/my-orders")
+    @PreAuthorize("hasAuthority('ROLE_CUSTOMER')")
+    public ResponseEntity<List<OrderResponseDTO>> getMyOrders() {
+        List<OrderResponseDTO> orders = orderService.getMyOrders();
+        return ResponseEntity.ok(orders);
+    }
+
+    @GetMapping("/{orderId}")
+    @PreAuthorize("hasAuthority('ROLE_CUSTOMER')")
+    public ResponseEntity<OrderResponseDTO> getOrderById(@PathVariable Long orderId) {
+        OrderResponseDTO order = orderService.getOrderById(orderId);
+        return ResponseEntity.ok(order);
+    }
 
 }

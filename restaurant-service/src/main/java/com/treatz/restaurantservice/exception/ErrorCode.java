@@ -1,0 +1,24 @@
+package com.treatz.restaurantservice.exception;
+
+public enum ErrorCode {
+    RESTAURANT_NOT_FOUND("RESTAURANT_NOT_FOUND"),
+    MENU_ITEM_NOT_FOUND("MENU_ITEM_NOT_FOUND"),
+    MENU_ITEM_NOT_BELONGS_TO_RESTAURANT("MENU_ITEM_NOT_BELONGS_TO_RESTAURANT"),
+    INVALID_INPUT("INVALID_INPUT"),
+    ACCESS_DENIED("ACCESS_DENIED"),
+    UNAUTHORIZED_ACCESS("UNAUTHORIZED_ACCESS"),
+    DUPLICATE_RESTAURANT_EMAIL("DUPLICATE_RESTAURANT_EMAIL"),
+    INTERNAL_SERVER_ERROR("INTERNAL_SERVER_ERROR"),
+    INVALID_CATEGORY("INVALID_CATEGORY"),
+    INVALID_PRICE("INVALID_PRICE");
+
+    private final String code;
+
+    ErrorCode(String code) {
+        this.code = code;
+    }
+
+    public String getCode() {
+        return code;
+    }
+}

@@ -40,6 +40,28 @@ public class Order implements Serializable {
     @Column(nullable = false)
     private OrderStatus status;
 
+    // Payment Information
+    @Enumerated(EnumType.STRING)
+    @Column(name = "payment_status", nullable = false)
+    private PaymentStatus paymentStatus;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "payment_method", nullable = false)
+    private PaymentMethod paymentMethod;
+
+    @Column(name = "payment_transaction_id", length = 100)
+    private String paymentTransactionId;
+
+    // Delivery Information
+    @Column(name = "delivery_address", nullable = false, length = 500)
+    private String deliveryAddress;
+
+    @Column(name = "customer_phone", nullable = false, length = 20)
+    private String customerPhone;
+
+    @Column(name = "delivery_instructions", length = 500)
+    private String deliveryInstructions;
+
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonManagedReference
     private List<OrderItem> items;

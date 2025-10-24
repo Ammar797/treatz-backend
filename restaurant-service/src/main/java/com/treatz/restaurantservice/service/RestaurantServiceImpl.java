@@ -3,11 +3,14 @@ package com.treatz.restaurantservice.service;
 import com.treatz.restaurantservice.dto.*;
 import com.treatz.restaurantservice.entity.MenuItem;
 import com.treatz.restaurantservice.entity.Restaurant;
+import com.treatz.restaurantservice.exception.MenuItemNotBelongsToRestaurantException;
 import com.treatz.restaurantservice.exception.ResourceNotFoundException;
 import com.treatz.restaurantservice.mapper.RestaurantMapper;
 import com.treatz.restaurantservice.repository.MenuItemRepository;
 import com.treatz.restaurantservice.repository.RestaurantRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -63,9 +66,9 @@ public class RestaurantServiceImpl implements RestaurantService {
     }
 
     @Override
-    public List<RestaurantResponseDTO> getAllRestaurants() {
+    public List<RestaurantSummaryDTO> getAllRestaurants() {
         return restaurantRepository.findAll().stream()
-                .map(restaurantMapper::restaurantToResponseDTO)
+                .map(restaurantMapper::restaurantToSummaryDTO)
                 .collect(Collectors.toList());
     }
 
@@ -87,7 +90,9 @@ public class RestaurantServiceImpl implements RestaurantService {
                 .orElseThrow(() -> new ResourceNotFoundException("Menu item not found with id: " + menuItemId));
 
         if (!menuItem.getRestaurant().getId().equals(restaurant.getId())) {
-            throw new IllegalArgumentException("Menu item does not belong to this restaurant.");
+            throw new MenuItemNotBelongsToRestaurantException(
+                    String.format("Menu item with ID %d does not belong to restaurant with ID %d",
+                            menuItemId, restaurantId));
         }
 
         restaurantMapper.updateMenuItemFromDto(request, menuItem);
@@ -102,7 +107,9 @@ public class RestaurantServiceImpl implements RestaurantService {
                 .orElseThrow(() -> new ResourceNotFoundException("Menu item not found with id: " + menuItemId));
 
         if (!menuItem.getRestaurant().getId().equals(restaurant.getId())) {
-            throw new IllegalArgumentException("Menu item does not belong to this restaurant.");
+            throw new MenuItemNotBelongsToRestaurantException(
+                    String.format("Menu item with ID %d does not belong to restaurant with ID %d",
+                            menuItemId, restaurantId));
         }
         menuItemRepository.delete(menuItem);
         return "Menu item with ID " + menuItemId + " deleted successfully.";
@@ -121,9 +128,9 @@ public class RestaurantServiceImpl implements RestaurantService {
     // == SEARCH LOGIC ==
 
     @Override
-    public List<RestaurantResponseDTO> searchRestaurantsByName(String name) {
+    public List<RestaurantSummaryDTO> searchRestaurantsByName(String name) {
         return restaurantRepository.findByNameContainingIgnoreCase(name).stream()
-                .map(restaurantMapper::restaurantToResponseDTO)
+                .map(restaurantMapper::restaurantToSummaryDTO)
                 .collect(Collectors.toList());
     }
 
@@ -132,6 +139,26 @@ public class RestaurantServiceImpl implements RestaurantService {
         return menuItemRepository.findByNameContainingIgnoreCase(menuItemName).stream()
                 .map(restaurantMapper::menuItemToSearchResponseDTO)
                 .collect(Collectors.toList());
+    }
+
+    // == PAGINATED METHODS ==
+
+    @Override
+    public Page<RestaurantSummaryDTO> getAllRestaurants(Pageable pageable) {
+        return restaurantRepository.findAll(pageable)
+                .map(restaurantMapper::restaurantToSummaryDTO);
+    }
+
+    @Override
+    public Page<RestaurantSummaryDTO> searchRestaurantsByName(String name, Pageable pageable) {
+        return restaurantRepository.findByNameContainingIgnoreCase(name, pageable)
+                .map(restaurantMapper::restaurantToSummaryDTO);
+    }
+
+    @Override
+    public Page<MenuItemSearchResponseDTO> searchRestaurantsByMenuItem(String menuItemName, Pageable pageable) {
+        return menuItemRepository.findByNameContainingIgnoreCase(menuItemName, pageable)
+                .map(restaurantMapper::menuItemToSearchResponseDTO);
     }
 
     // == HELPER METHODS ==

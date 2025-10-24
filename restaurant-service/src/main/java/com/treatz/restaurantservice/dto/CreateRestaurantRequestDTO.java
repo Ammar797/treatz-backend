@@ -14,9 +14,11 @@ public class CreateRestaurantRequestDTO {
     private String name;
 
     @NotBlank(message = "Description cannot be blank")
+    @Size(min = 10, max = 1000, message = "Description must be between 10 and 1000 characters")
     private String description;
 
     @NotBlank(message = "Address cannot be blank")
+    @Size(min = 5, max = 255, message = "Address must be between 5 and 255 characters")
     private String address;
 
     @NotBlank(message = "Phone number cannot be blank")

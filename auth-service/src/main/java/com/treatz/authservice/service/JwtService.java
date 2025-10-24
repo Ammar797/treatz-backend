@@ -2,7 +2,6 @@ package com.treatz.authservice.service;
 
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
-import lombok.RequiredArgsConstructor;  // ← Import this
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -12,13 +11,12 @@ import java.util.HashMap;
 import java.util.Map;
 
 @Service
-@RequiredArgsConstructor
 public class JwtService {
 
     private static final long TOKEN_VALIDITY = 10 * 60 * 60 * 1000;
 
     @Value("${jwt.secret}")
-    private final String secret;
+    private String secret;  // ← Removed 'final' keyword
 
     public String generateToken(String email, String role, Long userId) {
         Map<String, Object> claims = new HashMap<>();
